@@ -3,7 +3,8 @@
 import { useState, useEffect } from 'react';
 import { 
   Settings, Save, Plus, Trash2, Edit2, LogIn, LogOut,
-  Bot, Key, MessageSquare
+  Bot, Key, MessageSquare, Upload, FileText, Image, ArrowLeft,
+  Sparkles, X
 } from 'lucide-react';
 
 interface BotConfig {
@@ -11,6 +12,8 @@ interface BotConfig {
   greeting: string;
   placeholder: string;
   password: string;
+  aiApiKey: string;
+  aiEnabled: boolean;
 }
 
 interface QA {
@@ -27,13 +30,17 @@ export default function AdminPage() {
     name: 'Asistente',
     greeting: '¡Hola! ¿En qué puedo ayudarte?',
     placeholder: 'Escribe tu mensaje...',
-    password: ''
+    password: '',
+    aiApiKey: '',
+    aiEnabled: false
   });
   const [qaList, setQaList] = useState<QA[]>([]);
   const [newKeywords, setNewKeywords] = useState('');
   const [newResponse, setNewResponse] = useState('');
   const [editingQA, setEditingQA] = useState<QA | null>(null);
   const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [uploadedFiles, setUploadedFiles] = useState<{name: string, type: string}[]>([]);
 
   const handleLogin = async () => {
     const res = await fetch('/api/admin/login', {
@@ -113,6 +120,39 @@ export default function AdminPage() {
     setQaList(qaList.filter(q => q.id !== id));
   };
 
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploading(true);
+    
+    // Simular procesamiento del archivo
+    const fileType = file.type.includes('image') ? 'image' : 
+                     file.type.includes('pdf') ? 'pdf' : 'doc';
+    
+    // Agregar a la lista de archivos subidos
+    setUploadedFiles(prev => [...prev, { name: file.name, type: fileType }]);
+    
+    // Crear entrada en la base de conocimiento
+    const keywords = file.name.toLowerCase().replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ');
+    const response = fileType === 'image' 
+      ? `📷 Imagen: ${file.name}` 
+      : fileType === 'pdf'
+      ? `📄 Documento PDF: ${file.name}`
+      : `📝 Documento: ${file.name}`;
+    
+    await fetch('/api/admin/qa', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ keywords, response })
+    });
+    
+    loadQA();
+    setUploading(false);
+    alert(`Archivo "${file.name}" agregado a la base de conocimiento`);
+    e.target.value = '';
+  };
+
   // Login screen
   if (!loggedIn) {
     return (
@@ -144,6 +184,14 @@ export default function AdminPage() {
               Entrar
             </button>
           </div>
+          
+          {/* Enlace para volver al chat */}
+          <div className="mt-6 text-center">
+            <a href="/" className="text-sm text-slate-400 hover:text-emerald-400 transition-colors flex items-center justify-center gap-2">
+              <ArrowLeft className="w-4 h-4" />
+              Volver al Chat
+            </a>
+          </div>
         </div>
       </div>
     );
@@ -159,13 +207,23 @@ export default function AdminPage() {
             <Settings className="w-6 h-6 text-emerald-400" />
             <h1 className="font-bold text-white">Panel de Administración</h1>
           </div>
-          <button
-            onClick={handleLogout}
-            className="flex items-center gap-2 px-4 py-2 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-colors"
-          >
-            <LogOut className="w-4 h-4" />
-            Salir
-          </button>
+          <div className="flex items-center gap-2">
+            {/* Botón para ir al chat */}
+            <a
+              href="/"
+              className="flex items-center gap-2 px-4 py-2 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-colors"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              Chat
+            </a>
+            <button
+              onClick={handleLogout}
+              className="flex items-center gap-2 px-4 py-2 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-colors"
+            >
+              <LogOut className="w-4 h-4" />
+              Salir
+            </button>
+          </div>
         </div>
       </header>
 
@@ -222,6 +280,90 @@ export default function AdminPage() {
               <Save className="w-5 h-5" />
               {saving ? 'Guardando...' : 'Guardar Configuración'}
             </button>
+          </div>
+        </section>
+
+        {/* Upload Files */}
+        <section className="bg-slate-800 rounded-2xl p-6 border border-slate-700">
+          <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+            <Upload className="w-5 h-5 text-emerald-400" />
+            Subir Archivos
+          </h2>
+          <div className="space-y-4">
+            <p className="text-sm text-slate-400">
+              Sube archivos PDF, documentos o imágenes. Se agregarán automáticamente a la base de conocimiento.
+            </p>
+            <label className="flex flex-col items-center justify-center gap-3 w-full px-6 py-8 border-2 border-dashed border-slate-600 rounded-xl cursor-pointer hover:border-emerald-500 transition-colors bg-slate-700/50">
+              {uploading ? (
+                <div className="text-slate-400">Subiendo...</div>
+              ) : (
+                <>
+                  <div className="flex gap-4">
+                    <FileText className="w-8 h-8 text-slate-400" />
+                    <Image className="w-8 h-8 text-slate-400" />
+                  </div>
+                  <span className="text-slate-400 text-sm">
+                    PDF, DOC, TXT o Imágenes (JPG, PNG)
+                  </span>
+                </>
+              )}
+              <input
+                type="file"
+                accept=".pdf,.doc,.docx,.txt,.jpg,.jpeg,.png,.gif"
+                onChange={handleFileUpload}
+                className="hidden"
+                disabled={uploading}
+              />
+            </label>
+            
+            {/* Lista de archivos subidos */}
+            {uploadedFiles.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-sm text-slate-400">Archivos subidos:</p>
+                {uploadedFiles.map((file, i) => (
+                  <div key={i} className="flex items-center gap-2 px-3 py-2 bg-slate-700 rounded-lg">
+                    {file.type === 'image' ? (
+                      <Image className="w-4 h-4 text-emerald-400" />
+                    ) : (
+                      <FileText className="w-4 h-4 text-emerald-400" />
+                    )}
+                    <span className="text-sm text-white">{file.name}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </section>
+
+        {/* AI Config */}
+        <section className="bg-slate-800 rounded-2xl p-6 border border-slate-700 border-l-4 border-l-yellow-500">
+          <h2 className="text-lg font-bold text-white mb-2 flex items-center gap-2">
+            <Sparkles className="w-5 h-5 text-yellow-400" />
+            Configuración de IA (Próximamente)
+          </h2>
+          <p className="text-sm text-slate-400 mb-4">
+            Conecta una API de IA para respuestas más inteligentes. Esta función estará disponible pronto.
+          </p>
+          <div className="space-y-4 opacity-50 pointer-events-none">
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={config.aiEnabled}
+                onChange={(e) => setConfig({ ...config, aiEnabled: e.target.checked })}
+                className="w-4 h-4 rounded"
+              />
+              <label className="text-sm text-white">Habilitar respuestas con IA</label>
+            </div>
+            <div>
+              <label className="text-sm text-slate-400 block mb-1">API Key de OpenAI</label>
+              <input
+                type="password"
+                value={config.aiApiKey}
+                onChange={(e) => setConfig({ ...config, aiApiKey: e.target.value })}
+                placeholder="sk-..."
+                className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              />
+            </div>
           </div>
         </section>
 

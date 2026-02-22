@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { Send, Bot, User } from 'lucide-react';
+import { Send, Bot, User, RotateCcw } from 'lucide-react';
 
 interface Message {
   id: string;
@@ -16,12 +16,6 @@ interface BotConfig {
   placeholder: string;
 }
 
-interface QA {
-  id: string;
-  keywords: string;
-  response: string;
-}
-
 export default function ChatPublic() {
   const [config, setConfig] = useState<BotConfig | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -29,20 +23,33 @@ export default function ChatPublic() {
   const [loading, setLoading] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
+  const loadConfig = async () => {
+    const res = await fetch('/api/bot/config');
+    const data = await res.json();
+    setConfig(data);
+    return data;
+  };
+
+  const startNewConversation = async () => {
+    const configData = await loadConfig();
+    setMessages([{
+      id: Date.now().toString(),
+      role: 'bot',
+      content: configData.greeting,
+      time: new Date().toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' })
+    }]);
+  };
+
   useEffect(() => {
-    // Load bot config
-    fetch('/api/bot/config')
-      .then(res => res.json())
-      .then(data => {
-        setConfig(data);
-        setMessages([{
-          id: Date.now().toString(),
-          role: 'bot',
-          content: data.greeting,
-          time: new Date().toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' })
-        }]);
-        setLoading(false);
-      });
+    loadConfig().then(data => {
+      setMessages([{
+        id: Date.now().toString(),
+        role: 'bot',
+        content: data.greeting,
+        time: new Date().toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' })
+      }]);
+      setLoading(false);
+    });
   }, []);
 
   useEffect(() => {
@@ -96,17 +103,28 @@ export default function ChatPublic() {
     <div className="min-h-screen bg-gradient-to-b from-slate-900 to-slate-800 flex flex-col">
       {/* Header */}
       <header className="bg-slate-800/80 backdrop-blur-sm border-b border-slate-700 px-4 py-3 sticky top-0 z-40">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-emerald-400 to-cyan-500 flex items-center justify-center shadow-lg">
-            <Bot className="w-5 h-5 text-white" />
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-emerald-400 to-cyan-500 flex items-center justify-center shadow-lg">
+              <Bot className="w-5 h-5 text-white" />
+            </div>
+            <div>
+              <h1 className="font-bold text-white">{config?.name || 'Asistente'}</h1>
+              <p className="text-xs text-emerald-400 flex items-center gap-1">
+                <span className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></span>
+                En línea
+              </p>
+            </div>
           </div>
-          <div>
-            <h1 className="font-bold text-white">{config?.name || 'Asistente'}</h1>
-            <p className="text-xs text-emerald-400 flex items-center gap-1">
-              <span className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></span>
-              En línea
-            </p>
-          </div>
+          {/* Botón nueva conversación */}
+          <button
+            onClick={startNewConversation}
+            className="flex items-center gap-2 px-3 py-2 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-colors"
+            title="Nueva conversación"
+          >
+            <RotateCcw className="w-5 h-5" />
+            <span className="text-sm hidden sm:inline">Nueva</span>
+          </button>
         </div>
       </header>
 

@@ -1,0 +1,26 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_DATABASE_URL")
+}
+
+model BotConfig {
+  id        String   @id @default("default")
+  name      String   @default("Asistente")
+  greeting  String   @default("¡Hola! ¿En qué puedo ayudarte?")
+  placeholder String @default("Escribe tu mensaje...")
+  password  String   @default("admin123")
+  updatedAt DateTime @updatedAt
+}
+
+model QA {
+  id        String   @id @default(uuid())
+  keywords  String
+  response  String
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
+}
